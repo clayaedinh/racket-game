@@ -1,0 +1,174 @@
+#lang racket
+(require racket/gui/base)
+(require racket/draw)
+
+; === CONSTANTS ===
+
+(define WINDOW_NAME "flappy bords")
+(define FRAME_WIDTH 1200)
+(define FRAME_HEIGHT 600)
+(define FPS 40) ;frames per second
+(define MSPF (/ 1000 FPS)) ;milliseconds per frame
+
+(define GRAV_ACCEL 400) ;acceleration due to gravity in pixels
+(define JUMP_YVEL 350) ;initial velocity after jump / spacebar
+
+(define TIME_START (current-milliseconds)) ;when the program started
+
+; === GLOBALS ===
+
+(define game_active #f) ;determines whether the game is started or not
+
+; === BASIC ===
+
+; Create Frame
+(define frame (new frame% [label WINDOW_NAME] [width FRAME_WIDTH] [height FRAME_HEIGHT]))
+
+;Rectangles
+(struct rectangle ([x #:mutable] [y #:mutable] [w #:mutable] [h #:mutable]))
+
+(define (draw-rect dc brush pen rect)
+  (send dc set-brush brush)
+  (send dc set-pen pen)
+  (send dc draw-rectangle
+        (rectangle-x rect)
+        (rectangle-y rect)
+        (rectangle-w rect)
+        (rectangle-h rect)
+        ) 
+  )
+
+;Brush Styles
+(define pen-none (new pen% [style 'transparent]))
+(define brush-bird (new brush% [color "yellow"] [style 'solid]))
+
+; === START / LOSE ===
+
+(define (draw-start dc)
+  (send dc set-scale 3 3)
+  (send dc set-text-foreground "blue")
+  (send dc draw-text "Press [SPACE] to start" 0 0)
+  )
+(define (draw-lose dc)
+  (send dc set-scale 3 3)
+  (send dc set-text-foreground "red")
+  (send dc draw-text "You lost. Try again with [SPACE]" 0 0)
+  )
+
+(define (start-game)
+  (set! game_active #t)
+  (set! time-last-jump (current-milliseconds))
+ )
+
+(define (lose-game)
+  (set! game_active #f)
+  )
+
+; === BIRD ===
+
+(define bird (rectangle (/ FRAME_WIDTH 8) (/ FRAME_HEIGHT 2) 40 40))
+(define bird-prev-y (rectangle-y bird))
+
+(define (draw-bird dc)
+  (draw-rect dc brush-bird pen-none bird))
+
+; === PHYSICS / MOVEMENT ===
+
+;Time when the bird last jumped
+(define time-last-jump TIME_START)
+
+;Time since the bird last jumped
+(define (since-last-jump)
+  (- time-last-jump (current-milliseconds)))
+
+; Make bird fall
+
+(define (get-delta-y)
+  (define time (/ (since-last-jump) 1000))
+  (+ (* JUMP_YVEL time) (/ (* GRAV_ACCEL (* time time)) 2))
+ )
+
+(define (get-current-y)
+  (+ (get-delta-y) bird-prev-y)
+ )
+
+(define (setpos-bird)
+  ;set bird position
+  (set-rectangle-y! bird (get-current-y))
+
+  ;if bird hits floor, lose game
+  (if (> (rectangle-y bird) FRAME_HEIGHT)
+      (lose-game)
+      "Do nothing"
+  )
+  )
+
+; Make bird jump
+
+(define (jump)
+  (set! bird-prev-y (get-current-y))
+  (set! time-last-jump (current-milliseconds))
+  )
+
+
+; === MAIN DRAW ===
+; drawn every frame
+(define (draw-game dc)
+  (send dc set-scale 1 1)
+  (if game_active
+      (begin
+        (draw-bird dc)
+       )
+      (begin
+        (draw-start dc)
+        )
+      )
+  )
+
+; === GUI ===
+
+; Keyboard Event
+(define (keyboard-event event)
+  (if (equal? (send event get-key-code) #\space)
+      (if game_active
+          (jump)
+          (start-game)
+          )
+      "Do Nothing"
+      )
+  )
+
+;Canvas with custom keyboard event
+(define sb-canvas%
+  (class canvas%
+    (define/override(on-char event)
+      (keyboard-event event))
+    (super-new)))
+
+
+;Initialize canvas with custom paint callback
+(define canvas
+  (new sb-canvas%
+       [parent frame]
+       [paint-callback (λ (canvas dc) (draw-game dc))]))
+
+;Display Window
+(send frame show #t)
+
+; === GAME LOOP ===
+
+(define (gameloop)
+  (if game_active
+      (begin  
+        ;Physics Update
+        (setpos-bird)
+        
+        ;Redraw all objects
+        (send frame refresh)
+      )
+      (send frame refresh)
+  )
+  )
+
+(define timer (new timer% [notify-callback gameloop] [interval MSPF]))
+
