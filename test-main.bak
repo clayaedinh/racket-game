@@ -10,7 +10,7 @@
 (define FPS 40) ;frames per second
 (define MSPF (/ 1000 FPS)) ;milliseconds per frame
 
-(define GRAV_ACCEL 400) ;acceleration due to gravity in pixels
+(define GRAV_ACCEL 500) ;acceleration due to gravity in pixels
 (define JUMP_YVEL 350) ;initial velocity after jump / spacebar
 
 (define TIME_START (current-milliseconds)) ;when the program started
@@ -37,6 +37,23 @@
         (rectangle-h rect)
         ) 
   )
+
+;collision detection
+(define (colliding rect1 rect2)
+    (define x1 (rectangle-x rect1))
+    (define x2 (rectangle-x rect2))
+    (define y1 (rectangle-y rect1))
+    (define y2 (rectangle-y rect2))
+    (define w1 (rectangle-w rect1))
+    (define w2 (rectangle-w rect2))
+    (define h1 (rectangle-h rect1))
+    (define h2 (rectangle-h rect2))
+
+    (and (< x1 (+ x2 w2))
+        (> (+ x1 w1) x2)
+        (< y1 (+ y2 h2))
+        (> (+ h1 y1) y2))
+)
 
 ;Brush Styles
 (define pen-none (new pen% [style 'transparent]))
