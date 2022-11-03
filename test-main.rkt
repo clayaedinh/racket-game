@@ -18,15 +18,21 @@
 (define PIPE_SPEED 25) ;speed of the pipe moving to the left
 (define PIPE_SPAWN_X 700) ;pipe spawn location
 
+(define COIN_WIDTH 50) ;the thickness of the coin
+
+
 
 (define TIME_START (current-milliseconds)) ;when the program started
 
 ; === GLOBALS ===
 
 (define game_active #f) ;determines whether the game is started or not
+(define already_run #f) ;determines whether the game has already been run before
 (define deltaTime 0) ;time between frames
 (define currentTime (current-milliseconds))
 (define previousTime (current-milliseconds))
+
+(define score 0) ;score for the current run
 
 ; === BASIC ===
 
@@ -66,10 +72,16 @@
 (define (bird-hit-pipe bird pip)
   (or (colliding bird (pipe-top pip)) (colliding bird (pipe-bottom pip)))
   )
+
+(define (bird-hit-coin bird pip)
+  (colliding bird (pipe-coin pip))
+  )
+
 ;Brush Styles
 (define pen-none (new pen% [style 'transparent]))
 (define brush-bird (new brush% [color "red"] [style 'solid]))
 (define brush-pipe (new brush% [color "green"] [style 'solid]))
+(define brush-coin (new brush% [color "yellow"] [style 'solid]))
 
 ; === START / LOSE ===
 
@@ -81,7 +93,9 @@
 (define (draw-lose dc)
   (send dc set-scale 3 3)
   (send dc set-text-foreground "red")
-  (send dc draw-text "You lost. Try again with [SPACE]" 0 0)
+  (send dc draw-text "You lost." 0 0)
+  (send dc draw-text (format "Score: ~a" score) 0 15)
+  (send dc draw-text "Try again with [SPACE]" 0 30)
   )
 
 (define (start-game)
@@ -91,6 +105,7 @@
 
 (define (lose-game)
   (set! game_active #f)
+  (reset_pipe)
   )
 
 ; === BIRD ===
@@ -101,30 +116,54 @@
 (define (draw-bird dc)
   (draw-rect dc brush-bird pen-none bird))
 
+; === COIN ===
+
+(define coin (rectangle (/ FRAME_WIDTH 8) (/ FRAME_HEIGHT 2) 40 40))
+(define (draw-coin dc pip)
+  (draw-rect dc brush-coin pen-none coin))
+
+; === SCORE ===
+(define (draw-score dc)
+  (send dc set-scale 3 3)
+  (send dc set-text-foreground "black")
+  (send dc draw-text (format "~a" score) (/ FRAME_WIDTH 6) 0))
+
+
 ;=== pipe ===
-(struct pipe([top #:mutable] [bottom #:mutable]))
+(struct pipe([top #:mutable] [bottom #:mutable] [coin #:mutable] [collected #:mutable]))
 
 (define (create-pipe)
   (define top-height (* (random) (- (- FRAME_HEIGHT GAP_SIZE) 150)))
   (define top (rectangle PIPE_SPAWN_X 0 PIPE_WIDTH top-height))
   (define bottom (rectangle PIPE_SPAWN_X (+ top-height GAP_SIZE) PIPE_WIDTH ( - FRAME_HEIGHT (+ top-height GAP_SIZE))))
-  (pipe top bottom)
+  (define coin (
+                rectangle
+                PIPE_SPAWN_X
+                (- (+ top-height (/ GAP_SIZE 2)) (/ COIN_WIDTH 2))
+                COIN_WIDTH
+                COIN_WIDTH
+                )
+    )
+  (pipe top bottom coin #f)
   )
 
 (define (set-pipe-x x pip)
   (set-rectangle-x! (pipe-top pip) x)
   (set-rectangle-x! (pipe-bottom pip) x)
-  
+  (set-rectangle-x! (pipe-coin pip) (+ x (- (/ GAP_SIZE 2) COIN_WIDTH)))
   )
 
 (define (draw-pipe dc pip)
   (draw-rect dc brush-pipe pen-none (pipe-top pip))
   (draw-rect dc brush-pipe pen-none (pipe-bottom pip))
+  (if (not (pipe-collected pip))
+      (draw-rect dc brush-coin pen-none (pipe-coin pip))
+      "Do Nothing")
   )
 
 (define testpipe (create-pipe))
- 
-; === PHYSICS / MOVEMENT ===
+
+; === PHYSICS / MOVEMENT ===0
 
 ;Time when the bird last jumped
 (define time-last-jump TIME_START)
@@ -159,6 +198,15 @@
       (lose-game)
       "Do nothing"
       )
+
+  ;if bird hits coin, add 1 to score
+  (if (bird-hit-coin bird testpipe)
+      (begin
+            (if (not (pipe-collected testpipe)) (set! score (+ 1 score)) "Do nothing")
+            (set-pipe-collected! testpipe #t)
+        )
+      "Do nothing"
+      )
   )
 
 ; Make bird jump
@@ -171,23 +219,27 @@
 ; make pipe move
 
 (define (move_pipe pip)
-(define current_x (rectangle-x (pipe-top pip)))
-  (set-pipe-x (- current_x (* PIPE_SPEED deltaTime)) pip)
+  (define current_x (rectangle-x (pipe-top pip)))
+  (if (<= current_x (* -1 GAP_SIZE))
+      (reset_pipe)
+      (set-pipe-x (- current_x (* PIPE_SPEED deltaTime)) pip)
+      )
+  )
+
+(define (reset_pipe)
+  (set! testpipe (create-pipe))
   )
 
 ; === MAIN DRAW ===
 ; drawn every frame
 (define (draw-game dc)
   (send dc set-scale 1 1)
-  (if game_active
-      (begin
-        (draw-bird dc)
-        (draw-pipe dc testpipe)
-       )
-      (begin
-        (draw-start dc)
-        )
-      )
+  (cond
+    [(and game_active already_run) (draw-bird dc) (draw-pipe dc testpipe) (draw-score dc)]
+    [game_active (set! already_run #t) (draw-bird dc) (draw-pipe dc testpipe) (draw-score dc)]
+    [already_run (draw-lose dc)]
+    [else (draw-start dc)]
+    )
   )
 
 ; === GUI ===
@@ -197,7 +249,7 @@
   (if (equal? (send event get-key-code) #\space)
       (if game_active
           (jump)
-          (start-game)
+          (begin (set! score 0) (start-game))
           )
       "Do Nothing"
       )
@@ -233,7 +285,9 @@
         ;Redraw all objects
         (send frame refresh)
       )
-      (send frame refresh)
+      (begin
+        (send frame refresh)
+        )
   )
   (set! previousTime currentTime)
   )
