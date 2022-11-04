@@ -222,7 +222,7 @@
   (define current_x (rectangle-x (pipe-top pip)))
   (if (<= current_x (* -1 GAP_SIZE))
       (reset_pipe)
-      (set-pipe-x (- current_x (* (* PIPE_SPEED (+ 1 (/ score 10))) deltaTime)) pip)
+      (set-pipe-x (- current_x (* PIPE_SPEED deltaTime)) pip)
       )
   )
 
