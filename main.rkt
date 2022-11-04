@@ -161,7 +161,7 @@
       "Do Nothing")
   )
 
-(define testpipe (create-pipe))
+(define the_pipe (create-pipe))
 
 ; === PHYSICS / MOVEMENT ===0
 
@@ -194,16 +194,16 @@
   )
 
   ;if bird hits pipe, lose game.
-  (if (bird-hit-pipe bird testpipe)
+  (if (bird-hit-pipe bird the_pipe)
       (lose-game)
       "Do nothing"
       )
 
   ;if bird hits coin, add 1 to score
-  (if (bird-hit-coin bird testpipe)
+  (if (bird-hit-coin bird the_pipe)
       (begin
-            (if (not (pipe-collected testpipe)) (set! score (+ 1 score)) "Do nothing")
-            (set-pipe-collected! testpipe #t)
+            (if (not (pipe-collected the_pipe)) (set! score (+ 1 score)) "Do nothing")
+            (set-pipe-collected! the_pipe #t)
         )
       "Do nothing"
       )
@@ -227,7 +227,7 @@
   )
 
 (define (reset_pipe)
-  (set! testpipe (create-pipe))
+  (set! the_pipe (create-pipe))
   )
 
 ; === MAIN DRAW ===
@@ -235,8 +235,8 @@
 (define (draw-game dc)
   (send dc set-scale 1 1)
   (cond
-    [(and game_active already_run) (draw-bird dc) (draw-pipe dc testpipe) (draw-score dc)]
-    [game_active (set! already_run #t) (draw-bird dc) (draw-pipe dc testpipe) (draw-score dc)]
+    [(and game_active already_run) (draw-bird dc) (draw-pipe dc the_pipe) (draw-score dc)]
+    [game_active (set! already_run #t) (draw-bird dc) (draw-pipe dc the_pipe) (draw-score dc)]
     [already_run (draw-lose dc)]
     [else (draw-start dc)]
     )
@@ -281,7 +281,7 @@
       (begin  
         ;Physics Update
         (setpos-bird)
-        (move_pipe testpipe)
+        (move_pipe the_pipe)
         ;Redraw all objects
         (send frame refresh)
       )
